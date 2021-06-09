@@ -2,7 +2,7 @@
 
 # build-tools
 , bootPkgs
-, autoconf, automake, coreutils, fetchpatch, fetchurl, perl, python3, m4, sphinx
+, autoconf, automake, coreutils, fetchpatch, fetchurl, perl, python3, m4, sphinx, elfutils
 , bash
 
 , libiconv ? null, ncurses
@@ -41,6 +41,7 @@
 , # Whether to disable the large address space allocator
   # necessary fix for iOS: https://www.reddit.com/r/haskell/comments/4ttdz1/building_an_osxi386_to_iosarm64_cross_compiler/d5qvd67/
   disableLargeAddressSpace ? stdenv.targetPlatform.isDarwin && stdenv.targetPlatform.isAarch64
+, enableDwarf ? true
 }:
 
 assert !enableIntegerSimple -> gmp != null;
@@ -81,7 +82,8 @@ let
   libDeps = platform: lib.optional enableTerminfo ncurses
     ++ [libffi]
     ++ lib.optional (!enableIntegerSimple) gmp
-    ++ lib.optional (platform.libc != "glibc" && !targetPlatform.isWindows) libiconv;
+    ++ lib.optional (platform.libc != "glibc" && !targetPlatform.isWindows) libiconv
+    ++ lib.optional enableDwarf elfutils;
 
   toolsForTarget = [
     pkgsBuildTarget.targetPackages.stdenv.cc
@@ -122,6 +124,12 @@ stdenv.mkDerivation (rec {
       sha256 = "0r4zjj0bv1x1m2dgxp3adsf2xkr94fjnyj1igsivd9ilbs5ja0b5";
     })
   ];
+ #  ++ lib.optionals enableDwarf
+ # (fetchpatch { # Backport of https://phabricator.haskell.org/D5424 to fail loudly if libdw can't be found
+ #      url = "https://git.haskell.org/ghc.git/commitdiff_plain/cb882fc993b4972f7f212b291229ef9e9ade0af9";
+ #      sha256 = "0xmn57fr8cdxvnsc2ykdkcxflz3gkcirih6ca33d4b9hma8nfsrk";
+ #    })
+ #  ;
 
   postPatch = "patchShebangs .";
 
@@ -184,6 +192,8 @@ stdenv.mkDerivation (rec {
   ] ++ lib.optionals (targetPlatform == hostPlatform && !enableIntegerSimple) [
     "--with-gmp-includes=${targetPackages.gmp.dev}/include"
     "--with-gmp-libraries=${targetPackages.gmp.out}/lib"
+  ] ++ lib.optionals enableDwarf [
+    "--enable-dwarf-unwind"
   ] ++ lib.optionals (targetPlatform == hostPlatform && hostPlatform.libc != "glibc" && !targetPlatform.isWindows) [
     "--with-iconv-includes=${libiconv}/include"
     "--with-iconv-libraries=${libiconv}/lib"
