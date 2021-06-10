@@ -194,6 +194,8 @@ stdenv.mkDerivation (rec {
     "--with-gmp-libraries=${targetPackages.gmp.out}/lib"
   ] ++ lib.optionals enableDwarf [
     "--enable-dwarf-unwind"
+    "--with-libdw-includes=${lib.getDev elfutils}/include"
+    "--with-libdw-libraries=${lib.getLib elfutils}/lib"
   ] ++ lib.optionals (targetPlatform == hostPlatform && hostPlatform.libc != "glibc" && !targetPlatform.isWindows) [
     "--with-iconv-includes=${libiconv}/include"
     "--with-iconv-libraries=${libiconv}/lib"
